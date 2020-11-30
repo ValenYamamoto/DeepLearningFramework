@@ -19,9 +19,7 @@ class Tensor {
 
 		Tensor();
 		
-		template <typename Iter>
-		explicit Tensor( Iter values, Tensor *creators=nullptr, CreationOp creationOp=NONE );
-		Tensor( int size, double *data, Tensor *creators=nullptr, CreationOp creationOp=NONE );
+		Tensor( std::vector<double> values, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
 
 
 		Tensor( const Tensor& original );
@@ -30,7 +28,7 @@ class Tensor {
 
 		Tensor getGrad();
 
-		void backward( Tensor grad );
+		void backward( Tensor grad ) const;
 
 		Tensor operator +( const Tensor &right );
 		
@@ -39,12 +37,12 @@ class Tensor {
 		std::string to_string();
 
 	private:
-		int size;
-		Tensor *grad;
+		long unsigned int size;
+		mutable Tensor *grad;
 		double *data;
-		Tensor *creators;
 		CreationOp creationOp;
+		const Tensor* const *creators;
 
-		void createCreators( Tensor *creators, CreationOp creationOp );
+		Tensor( long unsigned int size, double *data, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
 };
 #endif
