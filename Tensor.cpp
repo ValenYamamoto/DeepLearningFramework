@@ -1,5 +1,6 @@
 #include "Tensor.hpp"
 #include <vector>
+#include <map>
 #include <string>
 #include <iostream>
 #define DEBUG 0
@@ -20,11 +21,12 @@ Tensor::Tensor() {
 	#if DEBUG
 	std::cout << "No arg Constructor" << std::endl;
 	#endif
-	size = 0;
+	size = 1;
 	data = nullptr;
 	creators = nullptr;
 	grad = nullptr;
 	creationOp=NONE;
+	autograd = false;
 }
 
 Tensor::Tensor( long unsigned int size, double *data, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{size}, grad{nullptr}, data{new double[size] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
@@ -87,7 +89,7 @@ Tensor& Tensor::operator =( const Tensor &right ) {
 			if( data != nullptr ) {
 				delete[] data;
 			}
-			data = new double[size];
+			data = new double[right.size];
 		}
 		if( creators != nullptr ) {
 			delete[] creators;
@@ -107,16 +109,19 @@ Tensor& Tensor::operator =( const Tensor &right ) {
 		this->size = right.size;
 		unsigned int i;
 		for( i=0; i<size; i++ ) {
-			this->grad[i] = right.grad[i];
+			this->data[i] = right.data[i];
 		}
 		creationOp = right.creationOp;
-		createCreators( right.creators, creationOp );
+		std::cout << right.creators[0]->to_string() << std::endl;
+		creators = createCreators( right.creators, creationOp );
+		autograd = right.autograd;
+		id = right.id;
 	}
 	return *this;
 }
 
 Tensor Tensor::operator +( const Tensor &right ) {
-	double *addData = new double[size];
+	double *addData = new double[right.size];
 
 	unsigned int i;
 	for( i=0; i<size; i++ ) {
@@ -125,7 +130,13 @@ Tensor Tensor::operator +( const Tensor &right ) {
 
 	const Tensor* const *c = new const Tensor* const[2]{ this, &right };
 
-	Tensor result = Tensor( size, addData, true, c, ADD );
+	Tensor result;
+	if( autograd && right.autograd ) {
+		result = Tensor{ size, addData, true, c, ADD };
+	} else {
+		result = Tensor{ size, addData };
+	}
+	std::cout << result.creators[0]->to_string() << std::endl;
 
 	delete[] addData;
 	delete[] c;
@@ -133,33 +144,51 @@ Tensor Tensor::operator +( const Tensor &right ) {
 	return result;
 }
 
-void Tensor::backward( Tensor grad ) const {
-	if( this->grad != nullptr ) {
-		std::cout << "HERE" << std::endl;
-		this->grad = new Tensor( grad );
-	} else {
-		delete this->grad;
-		this->grad = new Tensor( grad );
-	}
-	
-	if( creationOp == ADD ) {
-		creators[0]->backward( grad );
-		creators[1]->backward( grad );
+void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
+	std::cout << "inside backwards" << std::endl;
+	if( autograd ) {
+		std::cout << "backward autograd" << std::endl;
+		if( gradOrigin != nullptr ) {
+			if( children[ gradOrigin->id ] == 0 ) {
+				throw 0;
+			} else {
+				children[ gradOrigin->id ] -= 1;
+			}
+		}
+		if( this->grad == nullptr ) {
+			this->grad = new Tensor( grad );
+		} else {
+			*( this->grad ) = *(this->grad ) + grad ;
+		}
+		std::cout << gradFromAllChildren() << (creators!=nullptr) << std::endl;
+		if( creators != nullptr && ( gradFromAllChildren() || gradOrigin == nullptr ) ) {
+			std::cout << "Here" << std::endl;
+			if( creationOp == ADD ) {
+				creators[0]->backward( grad, this );
+				creators[1]->backward( grad, this );
+			}
+		}
 	}
 }
 
 Tensor Tensor::getGrad() {
-	return *grad;
+	if( grad != nullptr ) {
+		return *grad;
+	}
+	return Tensor();
 }
 
-std::string Tensor::to_string() {
-	std::string s;
-	s += "<" + std::to_string( data[0] );
-	for( unsigned int i=1; i<size; i++ ) {
-		s += ", " + std::to_string( data[i] );
+std::string Tensor::to_string() const {
+	if( data != nullptr ) {
+		std::string s;
+		s += "<" + std::to_string( data[0] );
+		for( unsigned int i=1; i<size; i++ ) {
+			s += ", " + std::to_string( data[i] );
+		}
+		s += ">";
+		return s;
 	}
-	s += ">";
-	return s;
+	return "";
 }
 
 void Tensor::createChildren() const {
@@ -173,7 +202,11 @@ void Tensor::createChildren() const {
 }
 
 void Tensor::addChild( int id ) const {
-	children.push_back( GradChild{ id, false} );
+	if( children.count( id ) == 0 ) {
+		children[ id ] = 1;
+	} else {
+		children[id] += 1;
+	}
 }
 
 int Tensor::createTensorId() {
@@ -181,11 +214,17 @@ int Tensor::createTensorId() {
 	return nextID-1;
 }
 
-bool Tensor::gradFromAllChildren() {
-	for( GradChild child : children ) {
-		if( child.received == false ) {
+bool Tensor::gradFromAllChildren() const {
+	std::map<int, int>::iterator it = children.begin();
+	for( ; it!=children.end(); it++ ) {
+		if( it->second != 0 ) {
+			std::cout << it->first << " " << it->second << std::endl;
 			return false;
 		}
 	}
 	return true;
+}
+
+bool Tensor::getAutograd() const {
+	return autograd;
 }

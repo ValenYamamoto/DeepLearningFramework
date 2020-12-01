@@ -1,6 +1,7 @@
 #ifndef TENSOR_H 
 #define TENSOR_H
 #include <vector>
+#include <map>
 #include <string>
 
 
@@ -28,21 +29,17 @@ class Tensor {
 
 		Tensor getGrad();
 
-		void backward( Tensor grad ) const;
+		void backward( Tensor grad, const Tensor* gradOrigin=nullptr ) const;
 
 		Tensor operator +( const Tensor &right );
 		
 		Tensor& operator =( const Tensor &right );
 
-		std::string to_string();
+		std::string to_string() const;
+
+		bool getAutograd() const;
 
 	private:
-		struct GradChild {
-			int id;
-			bool received;
-		};
-		static int nextID;
-
 		long unsigned int size;
 		mutable Tensor *grad;
 		double *data;
@@ -50,7 +47,9 @@ class Tensor {
 		const Tensor* const *creators;
 		bool autograd;
 		int id;
-		mutable std::vector<GradChild> children;
+		mutable std::map<int, int> children;
+
+		static int nextID;
 
 
 		Tensor( long unsigned int size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
@@ -58,6 +57,6 @@ class Tensor {
 		void addChild( int id ) const;
 		void createChildren() const;
 		static int createTensorId();
-		bool gradFromAllChildren();
+		bool gradFromAllChildren() const;
 };
 #endif
