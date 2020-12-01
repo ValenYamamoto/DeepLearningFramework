@@ -8,7 +8,6 @@ namespace {
 	const Tensor* const * createCreators( const Tensor* const *creators, Tensor::CreationOp creationOp ) {
 		switch( creationOp ) {
 			case Tensor::ADD:
-				std::cout << "case add " << std::endl;
 				return new const Tensor* const[2]{ creators[0], creators[1] };
 			default:
 				return nullptr;	
@@ -16,6 +15,7 @@ namespace {
 	}
 }
 
+int Tensor::nextID = 1;
 Tensor::Tensor() {
 	#if DEBUG
 	std::cout << "No arg Constructor" << std::endl;
@@ -27,16 +27,19 @@ Tensor::Tensor() {
 	creationOp=NONE;
 }
 
-Tensor::Tensor( long unsigned int size, double *data, const Tensor* const creators[], CreationOp creationOp ) : size{size}, grad{nullptr}, data{new double[size] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp ) } {
+Tensor::Tensor( long unsigned int size, double *data, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{size}, grad{nullptr}, data{new double[size] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
 	#if DEBUG
 	std::cout << "Array Constructor" << std::endl;
 	#endif
 	for( unsigned int i=0; i<size; i++ ) {
 		this->data[i] = data[i];
 	}
+	if( creators != nullptr ) {
+		createChildren();
+	}
 }
 
-Tensor::Tensor( std::vector<double> values, const Tensor* const creators[], CreationOp creationOp ) : size{values.size()}, grad{nullptr}, data{new double[size] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )} {
+Tensor::Tensor( std::vector<double> values, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{values.size()}, grad{nullptr}, data{new double[size] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
 	#if DEBUG
 	std::cout << "Vector Constructor" << std::endl;
 	#endif
@@ -44,9 +47,12 @@ Tensor::Tensor( std::vector<double> values, const Tensor* const creators[], Crea
 	for( unsigned int i=0; dataPointer<values.end(); i++, dataPointer++ ) {
 		data[i] = *dataPointer;
 	}
+	if( creators != nullptr ) {
+		createChildren();
+	}
 }
 
-Tensor::Tensor( const Tensor& original ) : size{original.size}, data{new double[size]}, creationOp{original.creationOp}, creators{createCreators(original.creators, creationOp) } {
+Tensor::Tensor( const Tensor& original ) : size{original.size}, data{new double[size]}, creationOp{original.creationOp}, creators{createCreators(original.creators, creationOp) }, autograd{original.autograd}, id{original.id} {
 	#if DEBUG
 	std::cout << "Copy Constructor" << std::endl;
 	#endif
@@ -119,7 +125,7 @@ Tensor Tensor::operator +( const Tensor &right ) {
 
 	const Tensor* const *c = new const Tensor* const[2]{ this, &right };
 
-	Tensor result = Tensor( size, addData, c, ADD );
+	Tensor result = Tensor( size, addData, true, c, ADD );
 
 	delete[] addData;
 	delete[] c;
@@ -154,4 +160,32 @@ std::string Tensor::to_string() {
 	}
 	s += ">";
 	return s;
+}
+
+void Tensor::createChildren() const {
+	switch( creationOp ) {
+		case ADD:
+			creators[0]->addChild( id );
+			creators[1]->addChild( id );
+		default:
+			;
+	}
+}
+
+void Tensor::addChild( int id ) const {
+	children.push_back( GradChild{ id, false} );
+}
+
+int Tensor::createTensorId() {
+	nextID++;
+	return nextID-1;
+}
+
+bool Tensor::gradFromAllChildren() {
+	for( GradChild child : children ) {
+		if( child.received == false ) {
+			return false;
+		}
+	}
+	return true;
 }

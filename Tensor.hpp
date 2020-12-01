@@ -19,7 +19,7 @@ class Tensor {
 
 		Tensor();
 		
-		Tensor( std::vector<double> values, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
+		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 
 		Tensor( const Tensor& original );
@@ -37,12 +37,27 @@ class Tensor {
 		std::string to_string();
 
 	private:
+		struct GradChild {
+			int id;
+			bool received;
+		};
+		static int nextID;
+
 		long unsigned int size;
 		mutable Tensor *grad;
 		double *data;
 		CreationOp creationOp;
 		const Tensor* const *creators;
+		bool autograd;
+		int id;
+		mutable std::vector<GradChild> children;
 
-		Tensor( long unsigned int size, double *data, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
+
+		Tensor( long unsigned int size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+
+		void addChild( int id ) const;
+		void createChildren() const;
+		static int createTensorId();
+		bool gradFromAllChildren();
 };
 #endif
