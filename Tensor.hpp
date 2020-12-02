@@ -9,6 +9,7 @@ class Tensor {
 	public:
 		enum CreationOp {
 			ADD, 
+			SUB,
 			NEG,
 			MUL,
 			SUM,
@@ -34,6 +35,10 @@ class Tensor {
 		Tensor operator +( const Tensor &right );
 
 		Tensor operator -();
+
+		Tensor operator -( const Tensor &right );
+
+		Tensor operator *( const Tensor &right );
 		
 		Tensor& operator =( const Tensor &right );
 

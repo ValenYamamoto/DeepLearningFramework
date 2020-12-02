@@ -9,6 +9,8 @@ namespace {
 	const Tensor* const * createCreators( const Tensor* const *creators, Tensor::CreationOp creationOp ) {
 		switch( creationOp ) {
 			case Tensor::ADD:
+			case Tensor::SUB:
+			case Tensor::MUL:
 				return new const Tensor* const[2]{ creators[0], creators[1] };
 			case Tensor::NEG:
 				return new const Tensor* const[1]{ creators[0] };
@@ -165,6 +167,52 @@ Tensor Tensor::operator -() {
 	return result;
 }
 
+Tensor Tensor::operator -( const Tensor &right ) {
+	double *addData = new double[right.size];
+
+	unsigned int i;
+	for( i=0; i<size; i++ ) {
+		addData[i] = this->data[i] - right.data[i];
+	}
+
+	const Tensor* const *c = new const Tensor* const[2]{ this, &right };
+
+	Tensor result;
+	if( autograd && right.autograd ) {
+		result = Tensor{ size, addData, true, c, SUB };
+	} else {
+		result = Tensor{ size, addData };
+	}
+
+	delete[] addData;
+	delete[] c;
+
+	return result;
+}
+
+Tensor Tensor::operator *( const Tensor &right ) {
+	double *mulData = new double[right.size];
+
+	unsigned int i;
+	for( i=0; i<size; i++ ) {
+		mulData[i] = this->data[i] * right.data[i];
+	}
+
+	const Tensor* const *c = new const Tensor* const[2]{ this, &right };
+
+	Tensor result;
+	if( autograd && right.autograd ) {
+		result = Tensor{ size, mulData, true, c, MUL };
+	} else {
+		result = Tensor{ size, mulData };
+	}
+
+	delete[] mulData;
+	delete[] c;
+
+	return result;
+}
+
 void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 	if( autograd ) {
 		if( gradOrigin != nullptr ) {
@@ -184,6 +232,14 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 				case ADD:
 					creators[0]->backward( grad, this );
 					creators[1]->backward( grad, this );
+					break;
+				case SUB:
+					creators[0]->backward( grad, this );
+					creators[1]->backward( -grad, this );
+					break;
+				case MUL:
+					creators[0]->backward( grad * *creators[1], this );
+					creators[1]->backward( grad * *creators[0], this );
 					break;
 				case NEG:
 					creators[0]->backward( -grad );
@@ -219,6 +275,8 @@ std::string Tensor::to_string() const {
 void Tensor::createChildren() const {
 	switch( creationOp ) {
 		case ADD:
+		case SUB:
+		case MUL:
 			creators[0]->addChild( id );
 			creators[1]->addChild( id );
 			break;
