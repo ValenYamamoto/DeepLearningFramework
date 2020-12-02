@@ -10,6 +10,8 @@ namespace {
 		switch( creationOp ) {
 			case Tensor::ADD:
 				return new const Tensor* const[2]{ creators[0], creators[1] };
+			case Tensor::NEG:
+				return new const Tensor* const[1]{ creators[0] };
 			default:
 				return nullptr;	
 		}
@@ -112,7 +114,6 @@ Tensor& Tensor::operator =( const Tensor &right ) {
 			this->data[i] = right.data[i];
 		}
 		creationOp = right.creationOp;
-		std::cout << right.creators[0]->to_string() << std::endl;
 		creators = createCreators( right.creators, creationOp );
 		autograd = right.autograd;
 		id = right.id;
@@ -136,7 +137,6 @@ Tensor Tensor::operator +( const Tensor &right ) {
 	} else {
 		result = Tensor{ size, addData };
 	}
-	std::cout << result.creators[0]->to_string() << std::endl;
 
 	delete[] addData;
 	delete[] c;
@@ -144,10 +144,29 @@ Tensor Tensor::operator +( const Tensor &right ) {
 	return result;
 }
 
-void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
-	std::cout << "inside backwards" << std::endl;
+Tensor Tensor::operator -() {
+	Tensor result;
+	double *negateData = new double[ size ];
+	unsigned int i;
+	for( i=0; i<size; i++ ) {
+		negateData[i] = data[i] * -1;
+	}
 	if( autograd ) {
-		std::cout << "backward autograd" << std::endl;
+		const Tensor* const *c = new const Tensor* const[1]{ this };
+		result = Tensor{ size, negateData, true, c, NEG };
+		std::cout << "NEG " << children.size() << std::endl;
+		delete[] c;
+	} else {
+		result = Tensor{ size, negateData };
+	}
+
+	delete[] negateData;
+	
+	return result;
+}
+
+void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
+	if( autograd ) {
 		if( gradOrigin != nullptr ) {
 			if( children[ gradOrigin->id ] == 0 ) {
 				throw 0;
@@ -160,13 +179,19 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 		} else {
 			*( this->grad ) = *(this->grad ) + grad ;
 		}
-		std::cout << gradFromAllChildren() << (creators!=nullptr) << std::endl;
 		if( creators != nullptr && ( gradFromAllChildren() || gradOrigin == nullptr ) ) {
-			std::cout << "Here" << std::endl;
-			if( creationOp == ADD ) {
-				creators[0]->backward( grad, this );
-				creators[1]->backward( grad, this );
+			switch( creationOp ){
+				case ADD:
+					creators[0]->backward( grad, this );
+					creators[1]->backward( grad, this );
+					break;
+				case NEG:
+					creators[0]->backward( -grad );
+					break;
+				default:
+					;
 			}
+			
 		}
 	}
 }
@@ -196,6 +221,10 @@ void Tensor::createChildren() const {
 		case ADD:
 			creators[0]->addChild( id );
 			creators[1]->addChild( id );
+			break;
+		case NEG:
+			creators[0]->addChild( id );
+			break;
 		default:
 			;
 	}

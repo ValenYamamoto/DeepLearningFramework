@@ -9,7 +9,7 @@ class Tensor {
 	public:
 		enum CreationOp {
 			ADD, 
-			SUB,
+			NEG,
 			MUL,
 			SUM,
 			EXPAND,
@@ -32,6 +32,8 @@ class Tensor {
 		void backward( Tensor grad, const Tensor* gradOrigin=nullptr ) const;
 
 		Tensor operator +( const Tensor &right );
+
+		Tensor operator -();
 		
 		Tensor& operator =( const Tensor &right );
 

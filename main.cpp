@@ -4,25 +4,26 @@
 
 int main() {
 	std::cout << "test start" << std::endl;
-	std::cout << "a" << std::endl;
-	Tensor a = Tensor( std::vector<double>{ 1, 2, 3, 4 }, true );
-	std::cout << "b" << std::endl;
-	Tensor b = Tensor( std::vector<double>{ 5, 6, 7, 8 }, true );
-	std::cout << "A autograd " << a.getAutograd() << std::endl;
-	std::cout << "B autograd " << b.getAutograd() << std::endl;
+	Tensor a = Tensor( std::vector<double>{ 1, 2, 3, 4, 5 }, true );
+	Tensor b = Tensor( std::vector<double>{ 2, 2, 2, 2, 2 }, true );
+	Tensor c = Tensor( std::vector<double>{ 5, 4, 3, 2, 1 }, true );
 
-	std::cout << "c" << std::endl;
-	Tensor c = a + b;
-	std::cout << "C autograd " << c.getAutograd() << std::endl;
-	std::cout << "A autograd " << a.getAutograd() << std::endl;
-	std::cout << "B autograd " << b.getAutograd() << std::endl;
+	Tensor bb = -b;
+	Tensor bbb = -b;
+	Tensor d = a + bb;
+	Tensor e = bbb + c;
+	Tensor f = d + e;
+
 
 	std::cout << "to string" << std::endl;
 	std::cout << a.to_string() << std::endl;
 	std::cout << b.to_string() << std::endl;
 	std::cout << c.to_string() << std::endl;
+	std::cout << d.to_string() << std::endl;
+	std::cout << e.to_string() << std::endl;
+	std::cout << f.to_string() << std::endl;
 	std::cout << "backward" << std::endl;
-	c.backward( Tensor( std::vector<double>{ 1, 1, 1, 1 } ) );
+	f.backward( Tensor( std::vector<double>{ 1, 1, 1, 1 } ) );
 	std::cout << "getGrad" << std::endl;
 	std::cout << a.getGrad().to_string() << std::endl;
 	std::cout << b.getGrad().to_string() << std::endl;
