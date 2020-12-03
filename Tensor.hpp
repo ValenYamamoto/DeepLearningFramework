@@ -1,6 +1,7 @@
 #ifndef TENSOR_H 
 #define TENSOR_H
 #include <vector>
+#include <tuple>
 #include <map>
 #include <string>
 
@@ -21,8 +22,10 @@ class Tensor {
 
 		Tensor();
 		
-		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
+		Tensor( std::vector<std::vector<double>> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+
+		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 		Tensor( const Tensor& original );
 
@@ -40,6 +43,10 @@ class Tensor {
 
 		Tensor operator *( const Tensor &right );
 		
+		Tensor mm( const Tensor &right );
+		
+		Tensor transpose() const;
+
 		Tensor& operator =( const Tensor &right );
 
 		std::string to_string() const;
@@ -47,7 +54,7 @@ class Tensor {
 		bool getAutograd() const;
 
 	private:
-		long unsigned int size;
+		std::tuple<int, int> size;
 		mutable Tensor *grad;
 		double *data;
 		CreationOp creationOp;
@@ -59,7 +66,7 @@ class Tensor {
 		static int nextID;
 
 
-		Tensor( long unsigned int size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+		Tensor( std::tuple<int, int> size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 		void addChild( int id ) const;
 		void createChildren() const;
