@@ -53,6 +53,8 @@ class Tensor {
 
 		bool getAutograd() const;
 
+		static Tensor random( int rows, int cols );
+
 	private:
 		std::tuple<int, int> size;
 		mutable Tensor *grad;

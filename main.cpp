@@ -27,5 +27,11 @@ int main() {
 	std::cout << "getGrad" << std::endl;
 	std::cout << a.getGrad().to_string() << std::endl;
 	std::cout << b.getGrad().to_string() << std::endl;
+
+	Tensor t1{ std::vector<double>{ 1, 2, 3, 4, 5 } };
+	Tensor t2 = t1.transpose();
+	std::cout << t2.to_string() << std::endl;
+	t2 = t1 * t2;
+	std::cout << t2.to_string() << std::endl;
 	return 0;
 }

@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <cstdlib>
 #define DEBUG 0
 
 namespace {
@@ -40,7 +41,7 @@ namespace {
 		int i, j;
 		for( i=0; i<r; i++ ) {
 			for( j=0; j<c; j++ ) {
-				*( result+r*i+j ) = *( m+r*j+i );
+				*( result+j*r+i ) = *( m+c*i+j );
 			}
 		}
 	}
@@ -112,6 +113,16 @@ Tensor::~Tensor() {
 	if( grad != nullptr ) {
 		delete grad;
 	}
+}
+
+Tensor Tensor::random( int rows, int cols ) {
+	std::tuple<int, int> size = std::tuple<int, int>{ rows, cols };
+	double *data = new double[ rows * cols ];
+	int i;
+	for( i=0; i<rows*cols; i++ ) {
+		data[i] = 2 * ( std::rand() / (double) RAND_MAX ) - 1;
+	}
+	return Tensor{ size, data };
 }
 
 Tensor& Tensor::operator =( const Tensor &right ) {
@@ -186,7 +197,6 @@ Tensor Tensor::operator -() {
 	if( autograd ) {
 		const Tensor* const *c = new const Tensor* const[1]{ this };
 		result = Tensor{ size, negateData, true, c, NEG };
-		std::cout << "NEG " << children.size() << std::endl;
 		delete[] c;
 	} else {
 		result = Tensor{ size, negateData };
@@ -267,8 +277,7 @@ Tensor Tensor::transpose() const {
 	transposeMatrix( std::get<0>( size ), std::get<1>( size ), data, transposeData ); 
 	if( autograd ) {
 		const Tensor* const *c = new const Tensor* const[1]{ this };
-		result = Tensor{ size, transposeData, true, c, TRANSPOSE };
-		std::cout << "NEG " << children.size() << std::endl;
+		result = Tensor{ std::tuple<int, int>{std::get<1>( size ), std::get<0>( size)}, transposeData, true, c, TRANSPOSE };
 		delete[] c;
 	} else {
 		result = Tensor{ size, transposeData };
