@@ -31,7 +31,15 @@ int main() {
 	Tensor t1{ std::vector<double>{ 1, 2, 3, 4, 5 } };
 	Tensor t2 = t1.transpose();
 	std::cout << t2.to_string() << std::endl;
-	t2 = t1 * t2;
+	t2 = t1.mm( t2 );
 	std::cout << t2.to_string() << std::endl;
+
+
+	Tensor t3{ std::vector<std::vector<double>>{ std::vector<double>{ 1, 2, 3 }, std::vector<double>{ 4, 5, 6 } } };
+	std::cout << t3.to_string() << std::endl;
+	Tensor t4{ std::vector<std::vector<double>>{ std::vector<double>{ 1, 2 }, std::vector<double>{ 3, 4 } } };
+	Tensor t5 = t4.mm( t4 );
+	std::cout << t5.to_string() << std::endl;
+
 	return 0;
 }

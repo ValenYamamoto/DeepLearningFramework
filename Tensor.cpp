@@ -30,9 +30,9 @@ namespace {
 			for( j=0; j<o; j++ ) {
 				sum = 0;
 				for( k=0; k<n; k++ ) {
-					sum += *( m1+m*i+k ) * *( m2+n*k+j );
+					sum += *( m1+n*i+k ) * *( m2+o*k+j );
 				}
-				*( result+m*i+j ) = sum;
+				*( result+n*i+j ) = sum;
 			}
 		}
 	}
@@ -83,6 +83,22 @@ Tensor::Tensor( std::vector<double> values, bool autograd, const Tensor* const c
 	std::vector<double>::iterator dataPointer = values.begin();
 	for( int i=0; dataPointer<values.end(); i++, dataPointer++ ) {
 		data[i] = *dataPointer;
+	}
+	if( creators != nullptr ) {
+		createChildren();
+	}
+}
+
+Tensor::Tensor( std::vector<std::vector<double>> values, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{std::tuple<int, int>(values.size(), values[0].size() )}, grad{nullptr}, data{new double[totalElements(size)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
+	#if DEBUG
+	std::cout << "Vector Constructor" << std::endl;
+	#endif
+	std::vector<std::vector<double>>::iterator rowPointer = values.begin();
+	for( int i=0; rowPointer<values.end(); i++, rowPointer++ ) {
+		std::vector<double>::iterator dataPointer = rowPointer->begin();
+		for( int j=0; dataPointer<rowPointer->end(); j++, dataPointer++ ) {
+			data[ std::get<1>( size ) * i + j ] = *dataPointer;
+		}
 	}
 	if( creators != nullptr ) {
 		createChildren();
