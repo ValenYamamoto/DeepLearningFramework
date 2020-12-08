@@ -375,7 +375,6 @@ Tensor Tensor::expand( int dim, int copies ) {
 
 
 void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
-	std::cout << "backward id: " << id << std::endl;
 	if( autograd && !noGrad ) {
 		if( gradOrigin != nullptr ) {
 			if( children[ gradOrigin->id ] == 0 ) {
