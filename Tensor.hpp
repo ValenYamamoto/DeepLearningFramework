@@ -53,6 +53,8 @@ class Tensor {
 		Tensor transpose() const;
 
 		Tensor sum( int dim=0 );
+		
+		Tensor expand( int dim, int copies ); 
 
 		Tensor& operator =( const Tensor &right );
 
@@ -82,6 +84,7 @@ class Tensor {
 
 		static int nextID;
 
+		int dim;
 
 
 		void addChild( int id ) const;

@@ -17,6 +17,7 @@ namespace {
 				return new const Tensor* const[2]{ creators[0], creators[1] };
 			case Tensor::NEG:
 			case Tensor::TRANSPOSE:
+			case Tensor::SUM:
 				return new const Tensor* const[1]{ creators[0] };
 			default:
 				return nullptr;	
@@ -342,14 +343,39 @@ Tensor Tensor::sum( int dim ) {
 	if( dim == 0 ) {
 		double *sumData = new double[ std::get<0>( size ) ];
 		sumDimZero( size, data, sumData );
-		Tensor result{ std::tuple<int, int>{ std::get<0>( size ), 1 }, sumData };
+		Tensor result;
+		if( autograd ) {
+			const Tensor* const *c = new const Tensor* const[1]{ this };
+			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( size )}, sumData, true, c, SUM };
+			delete[] c;
+		} else {
+			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( size ) }, sumData };
+		}
+		result.dim = dim;
 		delete[] sumData;
 		return result;
 	}
 	return Tensor();
 }
 
+Tensor Tensor::expand( int dim, int copies ) {
+	Tensor result;
+	double *expandData = new double[ totalElements( size ) * copies ];
+	int i;
+	for( i=0; i<totalElements( size ); i++ ) {
+		int j;
+		for( j=0; j<copies; j++ ) {
+			expandData[ i+totalElements( size )*j ] = data[i];
+		}
+	}
+	result = Tensor{ std::tuple<int, int>{ copies, std::get<1>( size ) }, expandData };
+	delete[] expandData;
+	return result;
+}
+
+
 void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
+	std::cout << "backward id: " << id << std::endl;
 	if( autograd && !noGrad ) {
 		if( gradOrigin != nullptr ) {
 			if( children[ gradOrigin->id ] == 0 ) {
@@ -364,6 +390,7 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 			*( this->grad ) = *(this->grad ) + grad ;
 		}
 		if( creators != nullptr && ( gradFromAllChildren() || gradOrigin == nullptr ) ) {
+			int ds;
 			switch( creationOp ){
 				case ADD:
 					creators[0]->backward( grad, this );
@@ -386,6 +413,10 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 					break;
 				case TRANSPOSE:
 					creators[0]->backward( this->grad->transpose() );
+					break;
+				case SUM:
+					ds = std::get<0>( creators[0]->size );
+					creators[0]->backward( this->grad->expand( dim, ds ) );
 					break;
 				default:
 					;
@@ -426,6 +457,7 @@ void Tensor::createChildren() const {
 			break;
 		case NEG:
 		case TRANSPOSE:
+		case SUM:
 			creators[0]->addChild( id );
 			break;
 		default:
