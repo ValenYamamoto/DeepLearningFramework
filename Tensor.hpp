@@ -20,12 +20,15 @@ class Tensor {
 			NONE
 		};
 
+		static bool noGrad;
+
 		Tensor();
-		
 
 		Tensor( std::vector<std::vector<double>> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+
+		Tensor( std::tuple<int, int> size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 		Tensor( const Tensor& original );
 
@@ -43,9 +46,13 @@ class Tensor {
 
 		Tensor operator *( const Tensor &right );
 		
+		Tensor operator *( const double &right );
+		
 		Tensor mm( const Tensor &right );
 		
 		Tensor transpose() const;
+
+		Tensor sum( int dim=0 );
 
 		Tensor& operator =( const Tensor &right );
 
@@ -53,7 +60,15 @@ class Tensor {
 
 		bool getAutograd() const;
 
-		static Tensor random( int rows, int cols );
+		static Tensor random( int rows, int cols, bool autograd=false );
+
+		static Tensor fill( int rows, int cols, double value, bool autograd=false );
+
+		static void setNoGrad( bool b );
+
+		void update( const Tensor &change );
+
+		void clearGrad();
 
 	private:
 		std::tuple<int, int> size;
@@ -68,7 +83,6 @@ class Tensor {
 		static int nextID;
 
 
-		Tensor( std::tuple<int, int> size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
 
 		void addChild( int id ) const;
 		void createChildren() const;

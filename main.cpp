@@ -40,6 +40,7 @@ int main() {
 	Tensor t4{ std::vector<std::vector<double>>{ std::vector<double>{ 1, 2 }, std::vector<double>{ 3, 4 } } };
 	Tensor t5 = t4.mm( t4 );
 	std::cout << t5.to_string() << std::endl;
+	std::cout << t5.transpose().to_string() << std::endl;
 
 	return 0;
 }
