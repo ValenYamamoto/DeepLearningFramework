@@ -1,3 +1,4 @@
+#include <functional>
 #include "Tensor.hpp"
 #include <vector>
 #include <tuple>
@@ -28,6 +29,7 @@ namespace {
 		int i, j, k;
 		for( i=0; i<m; i++ ) {
 			for( j=0; j<o; j++ ) {
+				*( result+o*i+j ) = 0;
 				for( k=0; k<n; k++ ) {
 					*( result+o*i+j ) += *( m1+n*i+k ) * *( m2+o*k+j );
 				}
@@ -44,16 +46,16 @@ namespace {
 		}
 	}
 
-	int totalElements( std::tuple<int, int> size ) {
-		return std::get<0>( size ) * std::get<1>( size );
+	int totalElements( std::tuple<int, int> sz ) {
+		return std::get<0>( sz ) * std::get<1>( sz );
 	}
 
-	void sumDimZero( std::tuple<int, int> size, double *m, double *result ) {
+	void sumDimZero( std::tuple<int, int> sz, double *m, double *result ) {
 		int i;
-		for( i=0; i< std::get<1>( size ); i++ ) {
+		for( i=0; i< std::get<1>( sz ); i++ ) {
 			double sum = 0;
-			for( int j=0; j< std::get<0>( size ); j++ ) {
-				sum += *(m + std::get<1>(size) * j + i );
+			for( int j=0; j< std::get<0>( sz ); j++ ) {
+				sum += *(m + std::get<1>(sz) * j + i );
 			}
 			*(result+i) = sum;
 		}
@@ -67,27 +69,29 @@ Tensor::Tensor() {
 	#if DEBUG
 	std::cout << "No arg Constructor" << std::endl;
 	#endif
-	size = std::tuple<int, int>{ 1, 1 };
+	sz = std::tuple<int, int>{ 1, 1 };
 	data = nullptr;
 	creators = nullptr;
 	grad = nullptr;
 	creationOp=NONE;
 	autograd = false;
+	backpropFunc = []( double d ){ return d; };
 }
 
-Tensor::Tensor( std::tuple<int, int> size, double *data, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{size}, grad{nullptr}, data{new double[totalElements(size)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
+Tensor::Tensor( std::tuple<int, int> size, double *data, bool autograd, const Tensor* const creators[], CreationOp creationOp ) : sz{size}, grad{nullptr}, data{new double[totalElements(size)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
 	#if DEBUG
 	std::cout << "Array Constructor" << std::endl;
 	#endif
-	for( int i=0; i<totalElements(size); i++ ) {
+	for( int i=0; i<totalElements(sz); i++ ) {
 		this->data[i] = data[i];
 	}
 	if( creators != nullptr ) {
 		createChildren();
 	}
+	backpropFunc = []( double d ){ return d; };
 }
 
-Tensor::Tensor( std::vector<double> values, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{std::tuple<int, int>(values.size(), 1 )}, grad{nullptr}, data{new double[totalElements(size)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
+Tensor::Tensor( std::vector<double> values, bool autograd, const Tensor* const creators[], CreationOp creationOp ) : sz{std::tuple<int, int>(values.size(), 1 )}, grad{nullptr}, data{new double[totalElements(sz)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
 	#if DEBUG
 	std::cout << "Vector Constructor" << std::endl;
 	#endif
@@ -98,9 +102,10 @@ Tensor::Tensor( std::vector<double> values, bool autograd, const Tensor* const c
 	if( creators != nullptr ) {
 		createChildren();
 	}
+	backpropFunc = []( double d ){ return d; };
 }
 
-Tensor::Tensor( std::vector<std::vector<double>> values, bool autograd, const Tensor* const creators[], CreationOp creationOp, int id ) : size{std::tuple<int, int>(values.size(), values[0].size() )}, grad{nullptr}, data{new double[totalElements(size)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
+Tensor::Tensor( std::vector<std::vector<double>> values, bool autograd, const Tensor* const creators[], CreationOp creationOp ) : sz{std::tuple<int, int>(values.size(), values[0].size() )}, grad{nullptr}, data{new double[totalElements(sz)] }, creationOp{creationOp}, creators{ createCreators(creators, creationOp )}, autograd{autograd}, id{Tensor::createTensorId()} {
 	#if DEBUG
 	std::cout << "Vector Constructor" << std::endl;
 	#endif
@@ -108,19 +113,20 @@ Tensor::Tensor( std::vector<std::vector<double>> values, bool autograd, const Te
 	for( int i=0; rowPointer<values.end(); i++, rowPointer++ ) {
 		std::vector<double>::iterator dataPointer = rowPointer->begin();
 		for( int j=0; dataPointer<rowPointer->end(); j++, dataPointer++ ) {
-			data[ std::get<1>( size ) * i + j ] = *dataPointer;
+			data[ std::get<1>( sz ) * i + j ] = *dataPointer;
 		}
 	}
 	if( creators != nullptr ) {
 		createChildren();
 	}
+	backpropFunc = []( double d ){ return d; };
 }
 
-Tensor::Tensor( const Tensor& original ) : size{original.size}, data{new double[totalElements(size)]}, creationOp{original.creationOp}, creators{createCreators(original.creators, creationOp) }, autograd{original.autograd}, id{original.id} {
+Tensor::Tensor( const Tensor& original ) : sz{original.sz}, data{new double[totalElements(sz)]}, creationOp{original.creationOp}, creators{createCreators(original.creators, creationOp) }, autograd{original.autograd}, id{original.id} {
 	#if DEBUG
 	std::cout << "Copy Constructor" << std::endl;
 	#endif
-	for( int i=0; i<totalElements(size); i++ ) {
+	for( int i=0; i<totalElements(sz); i++ ) {
 		data[i] = original.data[i];
 	}
 	if( original.grad == nullptr ) {
@@ -128,6 +134,10 @@ Tensor::Tensor( const Tensor& original ) : size{original.size}, data{new double[
 	} else {
 		grad = new Tensor(*original.grad);
 	}
+	if( creators != nullptr ) {
+		createChildren();
+	}
+	backpropFunc = original.backpropFunc;
 }
 
 Tensor::~Tensor() {
@@ -143,25 +153,25 @@ Tensor::~Tensor() {
 }
 
 Tensor Tensor::random( int rows, int cols, bool autograd ) {
-	std::tuple<int, int> size = std::tuple<int, int>{ rows, cols };
+	std::tuple<int, int> sz = std::tuple<int, int>{ rows, cols };
 	double *data = new double[ rows * cols ];
 	int i;
 	for( i=0; i<rows*cols; i++ ) {
 		data[i] = 2 * ( std::rand() / (double) RAND_MAX ) - 1;
 	}
-	Tensor result = Tensor{ size, data, autograd };
+	Tensor result = Tensor{ sz, data, autograd };
 	delete[] data;
 	return result;
 }
 
 Tensor Tensor::fill( int rows, int cols, double value, bool autograd ) {
-	std::tuple<int, int> size = std::tuple<int, int>{ rows, cols };
+	std::tuple<int, int> sz = std::tuple<int, int>{ rows, cols };
 	double *data = new double[ rows * cols ];
 	int i;
 	for( i=0; i<rows*cols; i++ ) {
 		data[i] = value;
 	}
-	Tensor result = Tensor{ size, data, autograd };
+	Tensor result = Tensor{ sz, data, autograd };
 	delete[] data;
 	return result;
 }
@@ -174,7 +184,7 @@ Tensor& Tensor::operator =( const Tensor &right ) {
 		if( data != nullptr ) {
 			delete[] data;
 		}
-		data = new double[totalElements(right.size)];
+		data = new double[totalElements(right.sz)];
 		if( creators != nullptr ) {
 			delete[] creators;
 		}
@@ -190,24 +200,25 @@ Tensor& Tensor::operator =( const Tensor &right ) {
 			}
 		}
 		
-		this->size = right.size;
+		this->sz = right.sz;
 		int i;
-		for( i=0; i<totalElements(size); i++ ) {
+		for( i=0; i<totalElements(sz); i++ ) {
 			this->data[i] = right.data[i];
 		}
 		creationOp = right.creationOp;
 		creators = createCreators( right.creators, creationOp );
 		autograd = right.autograd;
 		id = right.id;
+		backpropFunc = right.backpropFunc;
 	}
 	return *this;
 }
 
 Tensor Tensor::operator +( const Tensor &right ) {
-	double *addData = new double[totalElements(right.size)];
+	double *addData = new double[totalElements(right.sz)];
 
 	int i;
-	for( i=0; i<totalElements( size ); i++ ) {
+	for( i=0; i<totalElements( sz ); i++ ) {
 		addData[i] = right.data[i] + this->data[i];
 	}
 
@@ -215,9 +226,9 @@ Tensor Tensor::operator +( const Tensor &right ) {
 
 	Tensor result;
 	if( autograd && right.autograd && !noGrad ) {
-		result = Tensor{ size, addData, true, c, ADD };
+		result = Tensor{ sz, addData, true, c, ADD };
 	} else {
-		result = Tensor{ size, addData };
+		result = Tensor{ sz, addData };
 	}
 
 	delete[] addData;
@@ -228,17 +239,17 @@ Tensor Tensor::operator +( const Tensor &right ) {
 
 Tensor Tensor::operator -() {
 	Tensor result;
-	double *negateData = new double[ totalElements( size ) ];
+	double *negateData = new double[ totalElements( sz ) ];
 	int i;
-	for( i=0; i<totalElements( size ); i++ ) {
+	for( i=0; i<totalElements( sz ); i++ ) {
 		negateData[i] = data[i] * -1;
 	}
 	if( autograd && !noGrad ) {
 		const Tensor* const *c = new const Tensor* const[1]{ this };
-		result = Tensor{ size, negateData, true, c, NEG };
+		result = Tensor{ sz, negateData, true, c, NEG };
 		delete[] c;
 	} else {
-		result = Tensor{ size, negateData };
+		result = Tensor{ sz, negateData };
 	}
 
 	delete[] negateData;
@@ -247,10 +258,10 @@ Tensor Tensor::operator -() {
 }
 
 Tensor Tensor::operator -( const Tensor &right ) {
-	double *addData = new double[totalElements(right.size)];
+	double *addData = new double[totalElements(right.sz)];
 
 	int i;
-	for( i=0; i<totalElements( size ); i++ ) {
+	for( i=0; i<totalElements( sz ); i++ ) {
 		addData[i] = this->data[i] - right.data[i];
 	}
 
@@ -258,9 +269,9 @@ Tensor Tensor::operator -( const Tensor &right ) {
 
 	Tensor result;
 	if( autograd && right.autograd && !noGrad ) {
-		result = Tensor{ size, addData, true, c, SUB };
+		result = Tensor{ sz, addData, true, c, SUB };
 	} else {
-		result = Tensor{ size, addData };
+		result = Tensor{ sz, addData };
 	}
 
 	delete[] addData;
@@ -270,10 +281,10 @@ Tensor Tensor::operator -( const Tensor &right ) {
 }
 
 Tensor Tensor::operator *( const Tensor &right ) {
-	double *mulData = new double[totalElements(right.size)];
+	double *mulData = new double[totalElements(right.sz)];
 
 	int i;
-	for( i=0; i<totalElements(size); i++ ) {
+	for( i=0; i<totalElements(sz); i++ ) {
 		mulData[i] = this->data[i] * right.data[i];
 	}
 
@@ -281,9 +292,9 @@ Tensor Tensor::operator *( const Tensor &right ) {
 
 	Tensor result;
 	if( autograd && right.autograd && !noGrad ) {
-		result = Tensor{ size, mulData, true, c, MUL };
+		result = Tensor{ sz, mulData, true, c, MUL };
 	} else {
-		result = Tensor{ size, mulData };
+		result = Tensor{ sz, mulData };
 	}
 
 	delete[] mulData;
@@ -293,29 +304,29 @@ Tensor Tensor::operator *( const Tensor &right ) {
 }
 
 Tensor Tensor::operator *( const double &right ) {
-	double *mulData = new double[ totalElements( size ) ];
+	double *mulData = new double[ totalElements( sz ) ];
 	int i;
-	for( i=0; i<totalElements( size ); i++ ) {
+	for( i=0; i<totalElements( sz ); i++ ) {
 		mulData[i] = data[i] * right;
 	}
 
-	Tensor result{ size, mulData };
+	Tensor result{ sz, mulData };
 	delete[] mulData;
 	return result;
 }
 
 Tensor Tensor::mm( const Tensor &right ) {
-	double *mmData = new double[ std::get<0>( size ) * std::get<1>( right.size ) ];
+	double *mmData = new double[ std::get<0>( sz ) * std::get<1>( right.sz ) ];
 
-	naiveMatrixMult( std::get<0>( size ), std::get<1>( size ), std::get<1>( right.size ), data, right.data, mmData );
+	naiveMatrixMult( std::get<0>( sz ), std::get<1>( sz ), std::get<1>( right.sz ), data, right.data, mmData );
 
 	Tensor result;
 	if( autograd && right.autograd && !noGrad ) {
 		const Tensor* const *c = new const Tensor* const[2]{ this, &right };
-		result = Tensor{ std::tuple<int, int>{ std::get<0>( size ), std::get<1>( right.size )}, mmData, true, c, MM }; 
+		result = Tensor{ std::tuple<int, int>{ std::get<0>( sz ), std::get<1>( right.sz )}, mmData, true, c, MM }; 
 		delete[] c;
 	} else {
-		result = Tensor{ std::tuple<int, int>{ std::get<0>( size ), std::get<1>( right.size )}, mmData };
+		result = Tensor{ std::tuple<int, int>{ std::get<0>( sz ), std::get<1>( right.sz )}, mmData };
 	}
 
 	delete[] mmData;
@@ -324,14 +335,14 @@ Tensor Tensor::mm( const Tensor &right ) {
 
 Tensor Tensor::transpose() const {
 	Tensor result;
-	double *transposeData = new double[ totalElements( size ) ];
-	transposeMatrix( std::get<0>( size ), std::get<1>( size ), data, transposeData ); 
+	double *transposeData = new double[ totalElements( sz ) ];
+	transposeMatrix( std::get<0>( sz ), std::get<1>( sz ), data, transposeData ); 
 	if( autograd && !noGrad ) {
 		const Tensor* const *c = new const Tensor* const[1]{ this };
-		result = Tensor{ std::tuple<int, int>{std::get<1>( size ), std::get<0>( size)}, transposeData, true, c, TRANSPOSE };
+		result = Tensor{ std::tuple<int, int>{std::get<1>( sz ), std::get<0>( sz)}, transposeData, true, c, TRANSPOSE };
 		delete[] c;
 	} else {
-		result = Tensor{ std::tuple<int, int>{std::get<1>( size ), std::get<0>( size )}, transposeData };
+		result = Tensor{ std::tuple<int, int>{std::get<1>( sz ), std::get<0>( sz )}, transposeData };
 	}
 
 	delete[] transposeData;
@@ -341,15 +352,15 @@ Tensor Tensor::transpose() const {
 
 Tensor Tensor::sum( int dim ) {
 	if( dim == 0 ) {
-		double *sumData = new double[ std::get<0>( size ) ];
-		sumDimZero( size, data, sumData );
+		double *sumData = new double[ std::get<0>( sz ) ];
+		sumDimZero( sz, data, sumData );
 		Tensor result;
 		if( autograd ) {
 			const Tensor* const *c = new const Tensor* const[1]{ this };
-			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( size )}, sumData, true, c, SUM };
+			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( sz )}, sumData, true, c, SUM };
 			delete[] c;
 		} else {
-			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( size ) }, sumData };
+			result = Tensor{ std::tuple<int, int>{ 1, std::get<1>( sz ) }, sumData };
 		}
 		result.dim = dim;
 		delete[] sumData;
@@ -360,19 +371,22 @@ Tensor Tensor::sum( int dim ) {
 
 Tensor Tensor::expand( int dim, int copies ) {
 	Tensor result;
-	double *expandData = new double[ totalElements( size ) * copies ];
+	double *expandData = new double[ totalElements( sz ) * copies ];
 	int i;
-	for( i=0; i<totalElements( size ); i++ ) {
+	for( i=0; i<totalElements( sz ); i++ ) {
 		int j;
 		for( j=0; j<copies; j++ ) {
-			expandData[ i+totalElements( size )*j ] = data[i];
+			expandData[ i+totalElements( sz )*j ] = data[i];
 		}
 	}
-	result = Tensor{ std::tuple<int, int>{ copies, std::get<1>( size ) }, expandData };
+	result = Tensor{ std::tuple<int, int>{ copies, std::get<1>( sz ) }, expandData };
 	delete[] expandData;
 	return result;
 }
 
+double& Tensor::operator[]( int index ) {
+	return data[ index ];
+}
 
 void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 	if( autograd && !noGrad ) {
@@ -389,6 +403,9 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 			*( this->grad ) = *(this->grad ) + grad ;
 		}
 		if( creators != nullptr && ( gradFromAllChildren() || gradOrigin == nullptr ) ) {
+			for( int i=0; i<totalElements( this->grad->sz ); i++ ) {
+				this->grad->data[i] = backpropFunc( this->grad->data[i] );
+			}
 			int ds;
 			switch( creationOp ){
 				case ADD:
@@ -414,7 +431,7 @@ void Tensor::backward( Tensor grad, const Tensor* gradOrigin ) const {
 					creators[0]->backward( this->grad->transpose() );
 					break;
 				case SUM:
-					ds = std::get<0>( creators[0]->size );
+					ds = std::get<0>( creators[0]->sz );
 					creators[0]->backward( this->grad->expand( dim, ds ) );
 					break;
 				default:
@@ -434,9 +451,9 @@ Tensor Tensor::getGrad() {
 
 std::string Tensor::to_string() const {
 	if( data != nullptr ) {
-		std::string s;
+		std::string s = "";
 		s += "<" + std::to_string( data[0] );
-		for( int i=1; i<totalElements(size); i++ ) {
+		for( int i=1; i<totalElements(sz); i++ ) {
 			s += ", " + std::to_string( data[i] );
 		}
 		s += ">";
@@ -497,7 +514,7 @@ void Tensor::setNoGrad( bool b ) {
 
 void Tensor::update( const Tensor &change ) {
 	int i;
-	for( i=0; i < totalElements( size ); i++ ) {
+	for( i=0; i < totalElements( sz ); i++ ) {
 		data[i] -= change.data[i];
 	}
 }
@@ -506,5 +523,23 @@ void Tensor::clearGrad() {
 	if( grad != nullptr ) {
 		delete grad;
 		grad = nullptr;
+	}
+}
+
+std::tuple<int, int> Tensor::size() {
+	return sz;
+}
+
+double* Tensor::getData() {
+	return data;
+}
+
+void Tensor::setBackpropFunction( BackpropFunction func ) {
+	backpropFunc = func;
+}
+
+void Tensor::applyActivationFunction( BackpropFunction func ) {
+	for( int i=0; i<totalElements( sz ); i++ ) {
+		data[i] = func( data[i] );
 	}
 }

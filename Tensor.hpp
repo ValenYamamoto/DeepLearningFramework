@@ -1,5 +1,6 @@
 #ifndef TENSOR_H 
 #define TENSOR_H
+#include <functional>
 #include <vector>
 #include <tuple>
 #include <map>
@@ -7,6 +8,7 @@
 
 
 class Tensor {
+	using BackpropFunction = std::function<double(double)>;
 	public:
 		enum CreationOp {
 			ADD, 
@@ -24,11 +26,11 @@ class Tensor {
 
 		Tensor();
 
-		Tensor( std::vector<std::vector<double>> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+		Tensor( std::vector<std::vector<double>> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
 
-		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+		Tensor( std::vector<double> values, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
 
-		Tensor( std::tuple<int, int> size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE, int id=-1 );
+		Tensor( std::tuple<int, int> size, double *data, bool autograd=false, const Tensor* const creators[]=nullptr, CreationOp creationOp=NONE );
 
 		Tensor( const Tensor& original );
 
@@ -48,6 +50,8 @@ class Tensor {
 		
 		Tensor operator *( const double &right );
 		
+		double& operator[]( int index );
+
 		Tensor mm( const Tensor &right );
 		
 		Tensor transpose() const;
@@ -72,8 +76,16 @@ class Tensor {
 
 		void clearGrad();
 
+		std::tuple<int, int> size();
+
+		double* getData();
+
+		void setBackpropFunction( BackpropFunction func );
+
+		void applyActivationFunction( BackpropFunction func ); 
+
 	private:
-		std::tuple<int, int> size;
+		std::tuple<int, int> sz;
 		mutable Tensor *grad;
 		double *data;
 		CreationOp creationOp;
@@ -81,6 +93,7 @@ class Tensor {
 		bool autograd;
 		int id;
 		mutable std::map<int, int> children;
+		BackpropFunction backpropFunc;
 
 		static int nextID;
 

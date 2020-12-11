@@ -1,4 +1,3 @@
-#include <iostream>
 #include "../Tensor.hpp"
 #include "Layer.hpp"
 #include "Sequential.hpp"

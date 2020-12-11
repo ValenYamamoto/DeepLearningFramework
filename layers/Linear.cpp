@@ -1,3 +1,5 @@
+#include <tuple>
+#include <iostream>
 #include "Linear.hpp"
 #include "Layer.hpp"
 #include "../Tensor.hpp"

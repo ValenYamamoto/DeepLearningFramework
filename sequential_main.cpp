@@ -15,8 +15,6 @@ int main() {
 	Linear layer1 = Linear( 2, 3 );
 	Linear layer2 = Linear( 3, 1 );
 	Layer* layers[2] = { &layer1, &layer2 };
-	std::cout << layer2.getParameters()[0]->to_string() << std::endl;
-	std::cout << layers[0]->getParameters()[0]->getAutograd() << std::endl;
 	Sequential model = Sequential( 2, layers ); 
 
 	Tensor data = Tensor( std::tuple<int, int>{4, 2}, d, true );
@@ -30,7 +28,6 @@ int main() {
 			std::cout << "prediction is: " << prediction.to_string() << std::endl;
 			std::cout << "target is: " << target.to_string() << std::endl;
 			Tensor delta = prediction - target;
-			// std::cout << "delta is: " << delta.to_string() << std::endl;
 
 			Tensor loss = delta * delta;
 			Tensor lossSum = loss.sum();
